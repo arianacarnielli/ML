@@ -37,19 +37,20 @@ plt.scatter(geo_mat[:,1],geo_mat[:,0],alpha=0.8,s=3)
 ###################################################
 
 # discretisation pour l'affichage des modeles d'estimation de densite
-steps = 10
-xx,yy = np.meshgrid(np.linspace(xmin,xmax,steps),np.linspace(ymin,ymax,steps))
-grid = np.c_[xx.ravel(),yy.ravel()]
+steps = 100
 
 # A remplacer par res = monModele.predict(grid).reshape(steps,steps)
-#res = np.random.random((steps,steps))
-res = histogramme(geo_mat, xmin, xmax, ymin, ymax, steps)
+#res = histogramme(geo_mat, xmin, xmax, ymin, ymax, steps)
+hx = (xmax - xmin) / 50
+hy = (ymax - ymin) / 50
+res = noyau(geo_mat, xmin, xmax, ymin, ymax, steps, hx, hy, normal)
+
 plt.figure()
-#show_map()
+show_map()
 plt.imshow(res,extent=[xmin,xmax,ymin,ymax],interpolation='none',\
-               alpha=0.3,origin = "lower")
+               alpha=0.5, origin = "center")
 plt.colorbar()
-#plt.scatter(geo_mat[:,0],geo_mat[:,1],alpha=0.3)
+plt.scatter(geo_mat[:,1],geo_mat[:,0],alpha=0.3)
 
 
 
