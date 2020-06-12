@@ -42,7 +42,7 @@ class Image:
         # On la convertit à des entrées dans [-1, 1]
         self.img = 2*self.img - 1
 
-    def show(self, color = None):
+    def show(self, color = None, ax = None):
         """
         color : tuple avec 3 entrées dans [0, 1] représentant la couleur
         utilisée, dans le mode hsv si self.hsv est True, en mode rgb sinon.
@@ -63,7 +63,10 @@ class Image:
         if self.hsv:
             new_im = clr.hsv_to_rgb(new_im)
         
-        plt.imshow(new_im)
+        if ax is None:
+            plt.imshow(new_im)
+        else:
+            ax.imshow(new_im)
     
     def get_patch(self, i, j, h):
         """
@@ -114,6 +117,18 @@ class Image:
                 else:
                     noisy[(i, j)] = p
         return noisy, atoms
+    
+    def get_boundary_patches(self, h):
+        boundary = {}
+        
+        noisy = set(zip(*np.where(self.img[:, :, 0] == -100)))
+        for i, j in noisy:
+            if (i-1 >= 0 and (i-1, j) not in noisy) or \
+               (j+1 < self.img.shape[1] and (i, j+1) not in noisy) or \
+               (i+1 < self.img.shape[0] and (i+1, j) not in noisy) or \
+               (j-1 >= 0 and (i, j-1) not in noisy):
+                boundary[(i, j)] = self.get_patch(i, j, h)
+        return boundary
 
 def patch_to_vect(patch):
     """
@@ -126,7 +141,7 @@ def vect_to_patch(vect):
     h = int(np.sqrt(vect.size//3))
     return vect.reshape(h, h, 3)
 
-def learn_w(noisy_patch, atoms, alpha = 0.01):
+def learn_w(noisy_patch, atoms, alpha = 0.01, predict = True):
     """
     """
     Y = patch_to_vect(noisy_patch)
@@ -140,14 +155,64 @@ def learn_w(noisy_patch, atoms, alpha = 0.01):
     lasso.fit(X[mask, :], Y[mask])
     
     w0 = lasso.intercept_
-    w = lasso.coef_
+    w = {k:lasso.coef_[i] for i, k in enumerate(list_keys)}
+    
+    if not predict:
+        return w0, w
     
     new_patch = Y.copy()
     new_patch[np.logical_not(mask)] = lasso.predict(X[np.logical_not(mask), :])
     
     new_patch = vect_to_patch(new_patch)
+    new_patch[new_patch >= 1] = 1
+    new_patch[new_patch <= -1] = -1
     
-    return w0, {k:w[i] for i, k in enumerate(list_keys)}, new_patch
+    return w0, w, new_patch
+
+def fill_image(img, h, step, score, alpha = 0.01, perc_best = 0.1,\
+               verbose = False):
+    """
+    """
+    boundary = img.get_boundary_patches(h)
+    list_pos = []
+    
+    while len(boundary) > 0:
+        if verbose:
+            print(len(boundary), end=' ')
+        
+        # Calcul d'un patch assez proche du meilleur
+        scores = {k: score(p) for k, p in boundary.items()}
+        max_score = max(scores.values())
+        tol_score = max_score * (1 - perc_best)
+        l = [k for k, s in scores.items() if s >= tol_score]
+        best_pos = np.random.choice(len(l))
+        best_pos = l[best_pos]
+        best_patch = boundary[best_pos]
+        
+        list_pos.append(best_pos)
+        
+        _, atoms = img.get_noisy_and_atoms(h, step)
+        
+        _, _, new_p = learn_w(best_patch, atoms, alpha = alpha)
+        best_patch[:, :, :] = new_p
+        
+        boundary = img.get_boundary_patches(h)
+    return list_pos
+
+def simple_score(patch):
+    """
+    """
+    return np.sum(patch!=-100)
+
+def std_score(patch, alpha = 0.5):
+    filled = np.sum(patch!=-100)/patch.size
+    std = 0
+    index = patch[:, :, 0] != -100
+    for i in range(patch.shape[2]):
+        std += patch[:, :, i][index].std()
+    std /= patch.shape[2]
+    
+    return filled + alpha * std
 
 if __name__=="__main__":
     plt.close("all")
@@ -160,29 +225,11 @@ if __name__=="__main__":
     
     #img.add_noise(0.5)
     #img.add_noise_rect(0.75, 125, 75, 30, 50)
-    img.delete_rect(150, 75, 30, 50)
+    img.delete_rect(125, 75, 30, 50)
     plt.figure()
     img.show()
     
-    noisy, atoms = img.get_noisy_and_atoms(14, 14)
+    order = fill_image(img, 9, 9, std_score, alpha = 0.001, perc_best = 0, verbose = True)
     
-    first_noisy = list(noisy.keys())[0]
-    
-    p0 = img0.get_patch(*first_noisy, 14)
-    ip0 = Image(img_data = p0, hsv = img.hsv)
-    plt.figure()
-    ip0.show()
-    
-    p1 = noisy[first_noisy]
-    ip1 = Image(img_data = p1, hsv = img.hsv)
-    plt.figure()
-    ip1.show()
-    
-    w0, w, p2 = learn_w(p1, atoms)
-    ip2 = Image(img_data = p2, hsv = img.hsv)
-    plt.figure()
-    ip2.show()
-    
-    p1[:, :, :] = p2
     plt.figure()
     img.show()
