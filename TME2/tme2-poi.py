@@ -40,10 +40,10 @@ plt.scatter(geo_mat[:,1],geo_mat[:,0],alpha=0.8,s=3)
 steps = 100
 
 # A remplacer par res = monModele.predict(grid).reshape(steps,steps)
-#res = histogramme(geo_mat, xmin, xmax, ymin, ymax, steps)
-hx = (xmax - xmin) / 50
-hy = (ymax - ymin) / 50
-res = noyau(geo_mat, xmin, xmax, ymin, ymax, steps, hx, hy, normal)
+res = histogramme(geo_mat, xmin, xmax, ymin, ymax, steps)
+#hx = (xmax - xmin) / 50
+#hy = (ymax - ymin) / 50
+#res = noyau(geo_mat, xmin, xmax, ymin, ymax, steps, hx, hy, normal)
 
 plt.figure()
 show_map()

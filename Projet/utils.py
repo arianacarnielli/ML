@@ -10,6 +10,7 @@ import matplotlib.colors as clr
 import numpy as np
 
 from sklearn.linear_model import Lasso
+from tqdm import tqdm
 
 class Image:
     """
@@ -169,34 +170,39 @@ def learn_w(noisy_patch, atoms, alpha = 0.01, predict = True):
     
     return w0, w, new_patch
 
-def fill_image(img, h, step, score, alpha = 0.01, perc_best = 0.1,\
-               verbose = False):
+def fill_image(img, h, step, score, alpha = 0.01, perc_best = 0.1):
     """
     """
     boundary = img.get_boundary_patches(h)
     list_pos = []
     
-    while len(boundary) > 0:
-        if verbose:
-            print(len(boundary), end=' ')
+    tot_missing = (img.img==-100).sum() // 3
+    with tqdm(total = tot_missing) as pbar:
         
-        # Calcul d'un patch assez proche du meilleur
-        scores = {k: score(p) for k, p in boundary.items()}
-        max_score = max(scores.values())
-        tol_score = max_score * (1 - perc_best)
-        l = [k for k, s in scores.items() if s >= tol_score]
-        best_pos = np.random.choice(len(l))
-        best_pos = l[best_pos]
-        best_patch = boundary[best_pos]
-        
-        list_pos.append(best_pos)
-        
-        _, atoms = img.get_noisy_and_atoms(h, step)
-        
-        _, _, new_p = learn_w(best_patch, atoms, alpha = alpha)
-        best_patch[:, :, :] = new_p
-        
-        boundary = img.get_boundary_patches(h)
+        while len(boundary) > 0:
+            
+            # Calcul d'un patch assez proche du meilleur
+            scores = {k: score(p) for k, p in boundary.items()}
+            max_score = max(scores.values())
+            tol_score = max_score * (1 - perc_best)
+            l = [k for k, s in scores.items() if s >= tol_score]
+            best_pos = np.random.choice(len(l))
+            best_pos = l[best_pos]
+            best_patch = boundary[best_pos]
+            
+            list_pos.append(best_pos)
+            
+            _, atoms = img.get_noisy_and_atoms(h, step)
+            
+            _, _, new_p = learn_w(best_patch, atoms, alpha = alpha)
+            best_patch[:, :, :] = new_p
+            
+            boundary = img.get_boundary_patches(h)
+            
+            missing = (img.img==-100).sum() // 3
+            pbar.update(tot_missing - missing)
+            tot_missing = missing
+            
     return list_pos
 
 def simple_score(patch):
@@ -229,7 +235,7 @@ if __name__=="__main__":
     plt.figure()
     img.show()
     
-    order = fill_image(img, 9, 9, std_score, alpha = 0.001, perc_best = 0, verbose = True)
+    order = fill_image(img, 9, 5, std_score, alpha = 0.001, perc_best = 0.1)
     
     plt.figure()
     img.show()

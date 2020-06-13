@@ -60,15 +60,21 @@ def normal (tab):
     rv = st.multivariate_normal(mean = np.zeros(tab.shape[1]))
     return rv.pdf(tab)
     
+
+def separation_test_app(data, p_app = 0.5):
+    index = np.arange(data.shape[0])
+    np.random.shuffle(index)
+    nb_app = int(data.shape[0] * p_app) 
     
-    
-    
+    app = data[index[:nb_app]]
+    test = data[index[nb_app:]]
+    return test, app
 
-
-
-
-
-
-
-
-    
+def noyau_vraisemblance(app, test, xmin, xmax, ymin, ymax, hx, hy, phi):
+    L = 0
+    N = app.shape[0]
+    for i in range(test.shape[0]):
+        y = test[i, 0]
+        x = test[i, 1]
+        L += np.log(1 / N) + np.log(1 / (hx * hy)) + np.log(phi((np.array([[y, x]]) - app) / np.array([[hy, hx]])).sum())
+    return L
